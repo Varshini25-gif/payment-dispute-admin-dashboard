@@ -1,6 +1,7 @@
 import streamlit as st
-import os
 from dotenv import load_dotenv
+from app.components.navbar import render_top_navbar
+from app.components.sidebar import render_sidebar_navigation
 
 # Load environment variables
 load_dotenv()
@@ -28,57 +29,32 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-def sidebar_navigation():
-    """Create sidebar navigation"""
-    st.sidebar.title("🏢 Admin Dashboard")
-    
-    # Navigation menu
-    page = st.sidebar.radio(
-        "Navigation",
-        ["Dashboard", "Disputes", "Analytics", "Users", "Settings"],
-        label_visibility="collapsed"
-    )
-    
-    # Sidebar info section
-    st.sidebar.markdown("---")
-    st.sidebar.subheader("ℹ️ About")
-    st.sidebar.info(
-        "Payment Dispute Admin Dashboard\n\n"
-        "Version: 0.1.0\n\n"
-        "Manage and monitor payment disputes efficiently."
-    )
-    
-    # Sidebar footer
-    st.sidebar.markdown("---")
-    st.sidebar.caption("© 2024 Payment Solutions. All rights reserved.")
-    
-    return page
 
 def render_page(page_name):
-    """Render the selected page"""
+    """Render the selected page."""
     if page_name == "Dashboard":
         from app.pages.dashboard import render as render_dashboard
         render_dashboard()
     elif page_name == "Disputes":
-        st.header("💬 Disputes Management")
-        st.info("Disputes management page - Coming soon!")
+        from app.pages.disputes import render as render_disputes
+        render_disputes()
     elif page_name == "Analytics":
-        st.header("📊 Analytics")
-        st.info("Analytics page - Coming soon!")
+        from app.pages.analytics import render as render_analytics
+        render_analytics()
     elif page_name == "Users":
-        st.header("👥 User Management")
-        st.info("User management page - Coming soon!")
+        from app.pages.users import render as render_users
+        render_users()
     elif page_name == "Settings":
-        st.header("⚙️ Settings")
-        st.info("Settings page - Coming soon!")
+        from app.pages.settings import render as render_settings
+        render_settings()
+
 
 def main():
-    """Main application entry point"""
-    # Render navigation
-    selected_page = sidebar_navigation()
-    
-    # Render selected page
+    """Main application entry point."""
+    selected_page = render_sidebar_navigation()
+    render_top_navbar()
     render_page(selected_page)
+
 
 if __name__ == "__main__":
     main()

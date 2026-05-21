@@ -1,5 +1,5 @@
 """Pages module for the application"""
 
-from . import dashboard
+from . import dashboard, disputes, analytics, users, settings
 
-__all__ = ["dashboard"]
+__all__ = ["dashboard", "disputes", "analytics", "users", "settings"]
