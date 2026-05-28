@@ -16,7 +16,7 @@ from .navbar import render_top_navbar, render_page_header
 from .sidebar import render_sidebar_navigation
 from .metric_cards import get_dashboard_metrics, render_metric_cards
 from .charts import render_status_chart, render_priority_chart, render_volume_chart
-from .tables import render_recent_disputes_table, generate_sample_disputes
+from .tables import render_recent_disputes_table, generate_sample_disputes, filter_disputes, paginate_dataframe
 
 __all__ = [
     "render_metric_card",
@@ -38,5 +38,7 @@ __all__ = [
     "render_priority_chart",
     "render_volume_chart",
     "render_recent_disputes_table",
-    "generate_sample_disputes"
+    "generate_sample_disputes",
+    "filter_disputes",
+    "paginate_dataframe"
 ]

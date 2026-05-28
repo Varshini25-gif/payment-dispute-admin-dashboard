@@ -1,18 +1,104 @@
-import streamlit as st
-import pandas as pd
+import math
 from datetime import datetime, timedelta
-import random
+
+import pandas as pd
+import streamlit as st
 
 
-def generate_sample_disputes(count=10):
-    """Generate sample dispute rows for placeholder tables."""
-    return pd.DataFrame({
-        "Dispute ID": [f"DIS-{1000 + i}" for i in range(count)],
-        "Status": [random.choice(["Pending", "In Review", "Resolved"]) for _ in range(count)],
-        "Amount": [f"${random.randint(100, 5000)}" for _ in range(count)],
-        "Created": [(datetime.now() - timedelta(days=random.randint(0, 30))).strftime("%Y-%m-%d") for _ in range(count)],
-        "Priority": [random.choice(["Low", "Medium", "High"]) for _ in range(count)]
-    })
+def generate_sample_disputes(count=25):
+    """Generate deterministic sample disputes for table rendering."""
+    statuses = ["Pending", "In Review", "Resolved", "Rejected"]
+    priorities = ["High", "Medium", "Low"]
+    customers = [
+        "Acme Corp",
+        "Globex",
+        "Initech",
+        "Umbrella Corp",
+        "Stark Industries",
+        "Hooli",
+        "Dunder Mifflin",
+    ]
+    reasons = [
+        "Duplicate charge",
+        "Unauthorized transaction",
+        "Refund mismatch",
+        "Cardholder dispute",
+        "Processing delay",
+        "Chargeback escalation",
+        "Fraud review",
+    ]
+    assigned_to = ["Jordan", "Taylor", "Morgan", "Casey", "Riley"]
+    base_date = datetime(2026, 5, 1)
+
+    rows = []
+    for index in range(count):
+        rows.append({
+            "Dispute ID": f"DIS-{1000 + index:04d}",
+            "Customer": customers[index % len(customers)],
+            "Status": statuses[index % len(statuses)],
+            "Priority": priorities[index % len(priorities)],
+            "Amount": f"${(index + 1) * 125:,.2f}",
+            "Created": (base_date - timedelta(days=index)).strftime("%Y-%m-%d"),
+            "Reason": reasons[index % len(reasons)],
+            "Assigned To": assigned_to[index % len(assigned_to)],
+        })
+
+    return pd.DataFrame(rows)
+
+
+def filter_disputes(data, search_term="", status=None, priority=None):
+    """Filter dispute rows by search text and categorical selectors."""
+    filtered = data.copy()
+
+    search_term = (search_term or "").strip().lower()
+    if search_term:
+        filtered["_search_index"] = filtered.apply(
+            lambda row: " ".join(
+                str(value).lower()
+                for value in [
+                    row.get("Dispute ID"),
+                    row.get("Customer"),
+                    row.get("Reason"),
+                    row.get("Amount"),
+                    row.get("Assigned To"),
+                ]
+            ),
+            axis=1,
+        )
+        filtered = filtered[filtered["_search_index"].str.contains(search_term, na=False)].copy()
+        filtered = filtered.drop(columns=["_search_index"])
+
+    if status and status != "All":
+        filtered = filtered[filtered["Status"] == status]
+
+    if priority and priority != "All":
+        filtered = filtered[filtered["Priority"] == priority]
+
+    return filtered.reset_index(drop=True)
+
+
+def paginate_dataframe(data, page_index=1, page_size=10):
+    """Return a paginated dataframe slice and pagination metadata."""
+    total_rows = len(data)
+    page_index = max(1, int(page_index))
+    page_size = max(1, int(page_size))
+    total_pages = max(1, math.ceil(total_rows / page_size)) if total_rows else 1
+    page_index = min(page_index, total_pages)
+
+    start_index = (page_index - 1) * page_size
+    end_index = start_index + page_size
+    page = data.iloc[start_index:end_index].reset_index(drop=True)
+
+    return page, {
+        "page_index": page_index,
+        "page_size": page_size,
+        "total_rows": total_rows,
+        "total_pages": total_pages,
+        "start_index": start_index,
+        "end_index": end_index,
+        "has_prev": page_index > 1,
+        "has_next": page_index < total_pages,
+    }
 
 
 def render_recent_disputes_table(data=None):
@@ -21,3 +107,4 @@ def render_recent_disputes_table(data=None):
     if data is None:
         data = generate_sample_disputes()
     st.dataframe(data, use_container_width=True, hide_index=True)
+
