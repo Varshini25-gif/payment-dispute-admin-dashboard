@@ -107,4 +107,3 @@ def render_recent_disputes_table(data=None):
     if data is None:
         data = generate_sample_disputes()
     st.dataframe(data, use_container_width=True, hide_index=True)
-

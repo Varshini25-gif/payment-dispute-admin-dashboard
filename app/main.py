@@ -41,6 +41,9 @@ def render_page(page_name):
     elif page_name == "Analytics":
         from app.pages.analytics import render as render_analytics
         render_analytics()
+    elif page_name == "Routing Rules":
+        from app.pages.routing_rules import render as render_routing_rules
+        render_routing_rules()
     elif page_name == "Users":
         from app.pages.users import render as render_users
         render_users()

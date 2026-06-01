@@ -8,7 +8,7 @@ def render_sidebar_navigation():
 
     page = st.sidebar.radio(
         "Navigation",
-        ["Dashboard", "Disputes", "Analytics", "Users", "Settings"],
+        ["Dashboard", "Disputes", "Analytics", "Routing Rules", "Users", "Settings"],
         index=0,
         label_visibility="collapsed"
     )
@@ -28,3 +28,4 @@ def render_sidebar_navigation():
     st.sidebar.caption("© 2026 Payment Solutions")
 
     return page
+
