@@ -5,7 +5,62 @@ import streamlit as st
 
 from app.components.common import render_priority_badge, render_status_badge
 from app.components.tables import filter_disputes, generate_sample_disputes, paginate_dataframe
+from app.services import dispute_service
 from app.state.session import SessionState
+
+
+REQUIRED_DISPUTE_COLUMNS = [
+    "Dispute ID",
+    "Customer",
+    "Amount",
+    "Status",
+    "Priority",
+    "Created",
+    "Reason",
+    "Assigned To",
+]
+
+
+def _normalize_dispute_records(records):
+    if records is None:
+        return pd.DataFrame(columns=REQUIRED_DISPUTE_COLUMNS)
+
+    if isinstance(records, dict) and "data" in records:
+        records = records["data"]
+
+    if not isinstance(records, list):
+        raise ValueError("Unexpected dispute API response format")
+
+    if len(records) == 0:
+        return pd.DataFrame(columns=REQUIRED_DISPUTE_COLUMNS)
+
+    df = pd.DataFrame(records)
+    rename_map = {
+        "dispute_id": "Dispute ID",
+        "id": "Dispute ID",
+        "customer": "Customer",
+        "customer_name": "Customer",
+        "amount": "Amount",
+        "status": "Status",
+        "priority": "Priority",
+        "created": "Created",
+        "created_date": "Created",
+        "reason": "Reason",
+        "assigned_to": "Assigned To",
+        "assignee": "Assigned To",
+    }
+    df = df.rename(columns=rename_map)
+
+    missing_columns = [col for col in REQUIRED_DISPUTE_COLUMNS if col not in df.columns]
+    if missing_columns:
+        raise ValueError(
+            f"Dispute API response is missing required fields: {', '.join(missing_columns)}"
+        )
+
+    if pd.api.types.is_numeric_dtype(df["Amount"]):
+        df["Amount"] = df["Amount"].apply(lambda value: f"${value:,.2f}")
+
+    return df[REQUIRED_DISPUTE_COLUMNS].copy()
 
 
 def render():
@@ -14,7 +69,26 @@ def render():
     st.header("💬 Disputes")
     st.markdown("Manage incoming disputes, review case details, and assign follow-up tasks.")
 
+    if "disputes_page" not in st.session_state:
+        st.session_state["disputes_page"] = 1
+
+    refresh_requested = st.button("Refresh disputes", key="refresh_disputes")
+
     disputes_data = SessionState.get_disputes_data()
+    if refresh_requested or not isinstance(disputes_data, pd.DataFrame):
+        with st.spinner("Loading disputes from API..."):
+            try:
+                api_response = dispute_service.get_disputes(limit=100)
+                disputes_data = _normalize_dispute_records(api_response)
+                SessionState.set_disputes_data(disputes_data)
+                st.success("Disputes loaded successfully.")
+            except Exception as exc:
+                st.error(f"Unable to load disputes: {exc}")
+                if not isinstance(disputes_data, pd.DataFrame):
+                    disputes_data = generate_sample_disputes(25)
+                    SessionState.set_disputes_data(disputes_data)
+                    st.warning("Showing fallback sample disputes while the API is unavailable.")
+
     if not isinstance(disputes_data, pd.DataFrame):
         disputes_data = generate_sample_disputes(25)
         SessionState.set_disputes_data(disputes_data)
@@ -59,9 +133,6 @@ def render():
         "priority": priority_filter,
     })
 
-    if "disputes_page" not in st.session_state:
-        st.session_state["disputes_page"] = 1
-
     total_pages = max(1, math.ceil(len(filtered_disputes) / page_size)) if filtered_disputes else 1
     if st.session_state["disputes_page"] > total_pages:
         st.session_state["disputes_page"] = total_pages
@@ -100,9 +171,7 @@ def render():
 
     st.dataframe(display_df, use_container_width=True, hide_index=True)
 
-    st.caption(
-        f"Showing {len(page_disputes)} of {len(filtered_disputes)} disputes."
-    )
+    st.caption(f"Showing {len(page_disputes)} of {len(filtered_disputes)} disputes.")
 
     nav_cols = st.columns([1, 1, 1])
     with nav_cols[0]:
@@ -142,5 +211,3 @@ def render():
 
             st.markdown("**Reason**")
             st.write(selected_dispute["Reason"])
-
-
