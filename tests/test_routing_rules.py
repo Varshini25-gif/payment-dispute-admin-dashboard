@@ -1,4 +1,5 @@
 import pytest
+from app.components.rule_table import build_rule_dataframe, get_rule_counts, normalize_rule_status
 from app.utils.helpers import (
     build_routing_table,
     evaluate_routing_rule,
@@ -73,3 +74,24 @@ def test_build_routing_table_constructs_dataframe():
     table = build_routing_table(rules)
     assert table.loc[0, "Name"] == "Test"
     assert table.loc[0, "Destination"] == "Queue X"
+
+
+def test_get_rule_counts_identifies_active_and_inactive():
+    rules = [
+        {"name": "Active rule", "status": "active"},
+        {"name": "Inactive rule", "status": "inactive"},
+    ]
+    counts = get_rule_counts(rules)
+    assert counts["total"] == 2
+    assert counts["active"] == 1
+    assert counts["inactive"] == 1
+
+
+def test_build_rule_dataframe_includes_status_normalization():
+    rules = [
+        {"name": "Rule", "condition": "amount > 0", "priority": "high", "destination": "Queue", "status": "ACTIVE"}
+    ]
+    table = build_rule_dataframe(rules)
+    assert table.loc[0, "Status"] == "active"
+    assert table.loc[0, "Priority"] == "high"
+    assert table.loc[0, "Condition"] == "amount > 0"

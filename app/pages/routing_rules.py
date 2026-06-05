@@ -1,6 +1,10 @@
 import streamlit as st
+from app.components.rule_table import (
+    render_editable_rule_table,
+    render_rule_status_summary,
+    render_rule_validation_summary,
+)
 from app.utils.helpers import (
-    build_routing_table,
     evaluate_routing_rule,
     match_routing_rules,
     parse_routing_yaml,
@@ -63,11 +67,9 @@ def render_yaml_upload_section():
             st.error(error)
 
     if validation_messages:
-        for message in validation_messages:
-            if message["severity"] == "error":
-                st.error(message["text"])
-            else:
-                st.warning(message["text"])
+        render_rule_validation_summary(validation_messages)
+    else:
+        render_rule_validation_summary([])
 
     if not rules and not parse_errors:
         st.info("No routing rules found. Paste a YAML configuration or upload a valid file to see rules here.")
@@ -76,14 +78,8 @@ def render_yaml_upload_section():
 
 
 def render_routing_rule_table(rules):
-    st.subheader("Routing Rule Table")
-
-    if not rules:
-        st.info("Load or paste routing YAML to populate the rule table.")
-        return
-
-    table_data = build_routing_table(rules)
-    st.dataframe(table_data, use_container_width=True, hide_index=True)
+    render_rule_status_summary(rules)
+    return render_editable_rule_table(rules)
 
 
 def render_test_routing_form(rules):
@@ -147,7 +143,7 @@ def render():
     rules = render_yaml_upload_section()
 
     st.markdown("---")
-    render_routing_rule_table(rules)
+    rules = render_routing_rule_table(rules)
 
     st.markdown("---")
     render_test_routing_form(rules)

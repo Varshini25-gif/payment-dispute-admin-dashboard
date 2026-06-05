@@ -17,6 +17,14 @@ from .sidebar import render_sidebar_navigation
 from .metric_cards import get_dashboard_metrics, render_metric_cards
 from .charts import render_status_chart, render_priority_chart, render_volume_chart
 from .tables import render_recent_disputes_table, generate_sample_disputes, filter_disputes, paginate_dataframe
+from .rule_table import (
+    build_rule_dataframe,
+    get_rule_counts,
+    normalize_rule_status,
+    render_editable_rule_table,
+    render_rule_status_summary,
+    render_rule_validation_summary,
+)
 
 __all__ = [
     "render_metric_card",
@@ -40,6 +48,11 @@ __all__ = [
     "render_recent_disputes_table",
     "generate_sample_disputes",
     "filter_disputes",
-    "paginate_dataframe"
+    "paginate_dataframe",
+    "build_rule_dataframe",
+    "get_rule_counts",
+    "normalize_rule_status",
+    "render_editable_rule_table",
+    "render_rule_status_summary",
+    "render_rule_validation_summary",
 ]
-
