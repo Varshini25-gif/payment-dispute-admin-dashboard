@@ -41,6 +41,9 @@ def render_page(page_name):
     elif page_name == "Analytics":
         from app.pages.analytics import render as render_analytics
         render_analytics()
+    elif page_name == "SLA Monitor":
+        from app.pages.sla_monitor import render as render_sla_monitor
+        render_sla_monitor()
     elif page_name == "Routing Analytics":
         from app.pages.routing_analytics import render as render_routing_analytics
         render_routing_analytics()
