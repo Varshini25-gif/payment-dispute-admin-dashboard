@@ -1,5 +1,13 @@
+import os
+import sys
+
 import streamlit as st
 from dotenv import load_dotenv
+
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+
 from app.components.navbar import render_top_navbar
 from app.components.sidebar import render_sidebar_navigation
 
