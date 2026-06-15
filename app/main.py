@@ -46,6 +46,9 @@ def render_page(page_name):
     elif page_name == "Disputes":
         from app.pages.disputes import render as render_disputes
         render_disputes()
+    elif page_name == "Jira Tracking":
+        from app.pages.jira_tracking import render as render_jira_tracking
+        render_jira_tracking()
     elif page_name == "Analytics":
         from app.pages.analytics import render as render_analytics
         render_analytics()

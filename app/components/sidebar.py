@@ -8,7 +8,7 @@ def render_sidebar_navigation():
 
     page = st.sidebar.radio(
         "Navigation",
-        ["Dashboard", "Disputes", "Analytics", "SLA Monitor", "Routing Analytics", "Routing Rules", "Users", "Settings"],
+        ["Dashboard", "Disputes", "Jira Tracking", "Analytics", "SLA Monitor", "Routing Analytics", "Routing Rules", "Users", "Settings"],
         index=0,
         label_visibility="collapsed"
     )
