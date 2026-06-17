@@ -64,6 +64,9 @@ def render_page(page_name):
     elif page_name == "Users":
         from app.pages.users import render as render_users
         render_users()
+    elif page_name == "Audit Logs":
+        from app.pages.audit_logs import render_audit_logs_page
+        render_audit_logs_page()
     elif page_name == "Settings":
         from app.pages.settings import render as render_settings
         render_settings()
