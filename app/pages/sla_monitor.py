@@ -1,97 +1,86 @@
-import pandas as pd
 import streamlit as st
 
-from app.components.metric_cards import render_metric_cards
+from app.components.breach_cards import render_sla_summary_cards
+from app.components.queue_metrics import render_queue_health_metrics
+from app.components.sla_charts import render_breach_trend_chart, render_resolution_time_chart
+from app.services.sla_service import sla_service
+
+try:
+    from streamlit_autorefresh import st_autorefresh
+except ImportError:  # pragma: no cover - optional dependency in local dev
+    st_autorefresh = None
+
+def _apply_real_time_refresh():
+    """Configure optional real-time refresh for SLA data."""
+    refresh_enabled = st.toggle("Enable real-time refresh", value=True)
+    refresh_seconds = st.selectbox("Refresh interval", [15, 30, 60, 120], index=1)
+
+    if refresh_enabled and st_autorefresh is not None:
+        st_autorefresh(interval=refresh_seconds * 1000, key="sla-auto-refresh")
+    elif refresh_enabled:
+        st.info("Install `streamlit-autorefresh` to enable automatic refresh ticks.")
 
 
-def build_sla_trend_data():
-    """Return deterministic SLA trend data for the monitor page."""
-    return pd.DataFrame(
-        {
-            "Day": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
-            "Response SLA %": [91, 89, 93, 88, 95, 90, 92],
-            "Resolution SLA %": [87, 90, 86, 91, 94, 89, 92],
-            "Breaches": [3, 4, 2, 5, 1, 3, 2],
-        }
-    )
+def _build_alerts(queue_health, summary):
+    """Generate actionable SLA alerts from live queue and summary data."""
+    alerts = []
+    critical_queues = [queue for queue in queue_health if str(queue.get("status", "")).lower() == "critical"]
+    if critical_queues:
+        queue_names = ", ".join(queue["queue"] for queue in critical_queues)
+        alerts.append(f"Critical queue detected: {queue_names}. Prioritize workload balancing.")
 
+    open_breaches = int(summary.get("open_breaches", 0))
+    if open_breaches > 0:
+        alerts.append(f"There are currently {open_breaches} open SLA breaches requiring triage.")
 
-def build_queue_sla_table():
-    """Return deterministic queue SLA performance rows."""
-    return pd.DataFrame(
-        [
-            {"Queue": "Fraud Review", "SLA %": 88, "Breaches": 5, "Status": "At risk"},
-            {"Queue": "Cardholder Support", "SLA %": 92, "Breaches": 2, "Status": "Stable"},
-            {"Queue": "Auto Approval", "SLA %": 97, "Breaches": 0, "Status": "Healthy"},
-            {"Queue": "Escalation Desk", "SLA %": 81, "Breaches": 7, "Status": "Critical"},
-        ]
-    )
+    avg_resolution_hours = float(summary.get("avg_resolution_hours", 0.0))
+    if avg_resolution_hours > 4.5:
+        alerts.append("Average resolution time is elevated; review bottlenecks in escalation paths.")
 
-
-def build_alerts():
-    """Return actionable SLA alerts for the monitor page."""
-    return [
-        "⚠️ Escalation Desk has 7 breaches and needs immediate agent reassignment.",
-        "⚠️ Fraud Review is now 12% below the weekly response SLA target.",
-        "⚠️ Two high-value disputes are approaching the 4-hour resolution threshold.",
-        "⚠️ Cardholder Support is trending upward; monitor noon shift capacity.",
-    ]
+    if not alerts:
+        alerts.append("All SLA indicators are stable. Continue monitoring for queue spikes.")
+    return alerts
 
 
 def render():
     """Render the SLA monitor dashboard page."""
     st.header("⌚ SLA Monitor")
-    st.markdown("Track SLA compliance, queue health, and active breaches in one place.")
+    st.markdown("Track SLA compliance with live breach trends, resolution performance, and queue health metrics.")
 
-    sla_metrics = [
-        {"label": "On-time Response", "value": "91%", "delta": "+3% vs last week", "icon": "⏱️"},
-        {"label": "Resolution SLA", "value": "89%", "delta": "-1% from target", "icon": "✅"},
-        {"label": "Open Breaches", "value": "17", "delta": "5 critical", "icon": "🚨"},
-        {"label": "Escalated Cases", "value": "8", "delta": "2 pending review", "icon": "📈"},
-    ]
+    controls_col, refresh_col = st.columns([3, 1])
+    with controls_col:
+        days = st.selectbox("Window", [7, 14, 30], index=0)
+    with refresh_col:
+        st.button("Refresh now")
 
-    st.subheader("SLA overview")
-    render_metric_cards(sla_metrics)
+    _apply_real_time_refresh()
+
+    dashboard_data = sla_service.get_dashboard_data(days=days)
+    if dashboard_data.get("is_fallback"):
+        st.warning("Showing sample SLA data because the SLA API is unavailable.")
+
+    summary = dashboard_data["summary"]
+    breach_trends = dashboard_data["breach_trends"]
+    resolution_times = dashboard_data["resolution_times"]
+    queue_health = dashboard_data["queue_health"]
+
+    st.subheader("SLA Summary")
+    render_sla_summary_cards(summary)
 
     st.markdown("---")
-    st.subheader("SLA charts")
-
-    trend_data = build_sla_trend_data()
-    queue_sla = build_queue_sla_table()
+    st.subheader("SLA Trends")
 
     col1, col2 = st.columns([2, 1])
     with col1:
-        st.line_chart(trend_data.set_index("Day")["Response SLA %"], use_container_width=True)
-        st.caption("Weekly response SLA trend across each day of the reporting window.")
+        render_breach_trend_chart(breach_trends)
 
     with col2:
-        st.bar_chart(trend_data.set_index("Day")["Breaches"], use_container_width=True)
-        st.caption("Count of SLA breaches by day for quick escalation spotting.")
+        render_resolution_time_chart(resolution_times)
 
     st.markdown("---")
-    st.subheader("Breach indicators")
-    indicator_cols = st.columns(3)
-    for indicator, column in zip(
-        [
-            ("Critical queues", "Escalation Desk", "2 queues above threshold"),
-            ("At-risk cases", "17 open", "5 will breach within 2 hours"),
-            ("Compliance score", "89%", "Target is 92%"),
-        ],
-        indicator_cols,
-    ):
-        with column:
-            st.markdown(
-                "<div style='background: #fff7ed; padding: 16px; border-radius: 12px; border: 1px solid #fed7aa;'>"
-                f"<strong>{indicator[0]}</strong><br/>{indicator[1]}<br/><span style='color:#b45309;'>{indicator[2]}</span>"
-                "</div>",
-                unsafe_allow_html=True,
-            )
-
-    st.markdown("---")
-    st.subheader("Queue SLA table")
-    st.dataframe(queue_sla, use_container_width=True, hide_index=True)
+    render_queue_health_metrics(queue_health)
 
     st.markdown("---")
     st.subheader("Alerts")
-    for alert in build_alerts():
-        st.warning(alert)
+    for alert in _build_alerts(queue_health, summary):
+        st.warning(f"⚠️ {alert}")

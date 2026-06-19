@@ -16,6 +16,9 @@ from .navbar import render_top_navbar, render_page_header
 from .sidebar import render_sidebar_navigation
 from .metric_cards import get_dashboard_metrics, render_metric_cards
 from .charts import render_status_chart, render_priority_chart, render_volume_chart
+from .sla_charts import render_breach_trend_chart, render_resolution_time_chart
+from .breach_cards import render_sla_summary_cards
+from .queue_metrics import render_queue_health_metrics
 from .tables import render_recent_disputes_table, generate_sample_disputes, filter_disputes, paginate_dataframe
 from .rule_table import (
     build_rule_dataframe,
@@ -45,6 +48,10 @@ __all__ = [
     "render_status_chart",
     "render_priority_chart",
     "render_volume_chart",
+    "render_breach_trend_chart",
+    "render_resolution_time_chart",
+    "render_sla_summary_cards",
+    "render_queue_health_metrics",
     "render_recent_disputes_table",
     "generate_sample_disputes",
     "filter_disputes",
