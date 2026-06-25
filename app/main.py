@@ -70,6 +70,9 @@ def render_page(page_name):
     elif page_name == "Audit Logs":
         from app.pages.audit_logs import render_audit_logs_page
         render_audit_logs_page()
+    elif page_name == "Confluence Logs":
+        from app.pages.confluence_logs import render as render_confluence_logs
+        render_confluence_logs()
     elif page_name == "Settings":
         from app.pages.settings import render as render_settings
         render_settings()
