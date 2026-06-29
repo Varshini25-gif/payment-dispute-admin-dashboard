@@ -23,19 +23,14 @@ st.set_page_config(
 )
 
 # Custom CSS
-st.markdown("""
-<style>
-    .main {
-        padding: 0rem 1rem;
-    }
-    .metric-card {
-        background-color: #f0f2f6;
-        padding: 20px;
-        border-radius: 10px;
-        margin: 10px 0;
-    }
-</style>
-""", unsafe_allow_html=True)
+def load_dashboard_css() -> None:
+    """Load shared dashboard stylesheet once per app run."""
+    css_path = os.path.join(PROJECT_ROOT, "assets", "styles", "dashboard.css")
+    if not os.path.exists(css_path):
+        return
+
+    with open(css_path, "r", encoding="utf-8") as css_file:
+        st.markdown(f"<style>{css_file.read()}</style>", unsafe_allow_html=True)
 
 
 def render_page(page_name):
@@ -80,6 +75,7 @@ def render_page(page_name):
 
 def main():
     """Main application entry point."""
+    load_dashboard_css()
     selected_page = render_sidebar_navigation()
     render_top_navbar()
     render_page(selected_page)

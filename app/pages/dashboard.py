@@ -2,13 +2,16 @@ import streamlit as st
 import pandas as pd
 
 from app.components.charts import render_status_chart, render_priority_chart, render_volume_chart
+from app.components.loading_states import render_chart_loading
 from app.components.metric_cards import get_dashboard_metrics, render_metric_cards
+from app.components.responsive_layout import render_section_shell, render_spacer, responsive_columns
+from app.components.reusable_widgets import render_kpi_tile
 from app.components.tables import render_recent_disputes_table
 
 
 def render_queue_overview_cards():
     """Render queue health cards for the dashboard."""
-    st.subheader("Queue Overview")
+    render_section_shell("Queue Overview", "Live operational counters for triage and handling capacity.")
 
     queue_metrics = [
         {"label": "Open Queue", "value": "142", "delta": "12 new today", "icon": "📥"},
@@ -17,21 +20,20 @@ def render_queue_overview_cards():
         {"label": "Agent Capacity", "value": "87%", "delta": "5 agents online", "icon": "👥"},
     ]
 
-    cols = st.columns(len(queue_metrics))
+    cols = responsive_columns(total_items=len(queue_metrics), max_columns=4)
     for metric, col in zip(queue_metrics, cols):
         with col:
-            st.markdown(
-                "<div style='background: #f8fafc; padding: 16px; border-radius: 12px; min-height: 140px;'>",
-                unsafe_allow_html=True,
+            render_kpi_tile(
+                label=metric["label"],
+                value=metric["value"],
+                delta=metric["delta"],
+                icon=metric["icon"],
             )
-            st.markdown(f"<div style='font-size: 24px; margin-bottom: 8px;'>{metric['icon']}</div>", unsafe_allow_html=True)
-            st.metric(label=metric["label"], value=metric["value"], delta=metric["delta"])
-            st.markdown("</div>", unsafe_allow_html=True)
 
 
 def render_sla_placeholder_chart():
     """Render a placeholder SLA chart for the dashboard."""
-    st.subheader("SLA Placeholder")
+    render_section_shell("SLA Placeholder", "Sample responsiveness trend for queue monitoring.")
 
     sla_data = pd.DataFrame(
         {
@@ -41,13 +43,13 @@ def render_sla_placeholder_chart():
         }
     )
 
-    st.line_chart(sla_data.set_index("Hour"))
+    st.line_chart(sla_data.set_index("Hour"), use_container_width=True)
     st.caption("Placeholder SLA trend for response and resolution targets.")
 
 
 def render_alerts_section():
     """Render dashboard alerts section."""
-    st.subheader("Alerts")
+    render_section_shell("Alerts", "Latest actionable notices across queues and SLA health.")
 
     alerts = [
         "High-priority dispute batch requires manual review before 3:00 PM.",
@@ -64,26 +66,27 @@ def render():
     st.header("📊 Dashboard")
     st.markdown("High-level dispute insights, queue health, and operational performance.")
 
-    st.subheader("Dashboard Metrics")
+    render_section_shell("Dashboard Metrics", "Top-level metrics with week-over-week movement.")
     render_metric_cards(get_dashboard_metrics())
+    render_spacer("md")
 
-    st.markdown("---")
     render_queue_overview_cards()
+    render_spacer("md")
 
-    st.markdown("---")
-    st.subheader("Operational Overview")
+    render_section_shell("Operational Overview", "Recent disputes and category distributions.")
     col1, col2 = st.columns([2, 1])
 
     with col1:
         render_recent_disputes_table()
 
     with col2:
+        render_chart_loading("Rendering charts...")
         render_status_chart()
         render_priority_chart()
         render_volume_chart()
 
-    st.markdown("---")
+    render_spacer("md")
     render_sla_placeholder_chart()
 
-    st.markdown("---")
+    render_spacer("md")
     render_alerts_section()

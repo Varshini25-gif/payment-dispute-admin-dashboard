@@ -1,5 +1,9 @@
 import streamlit as st
 
+from app.components.loading_states import render_skeleton_metrics
+from app.components.responsive_layout import responsive_columns
+from app.components.reusable_widgets import render_kpi_tile
+
 
 def get_dashboard_metrics():
     """Return a list of metric definitions for the dashboard."""
@@ -13,10 +17,16 @@ def get_dashboard_metrics():
 
 def render_metric_cards(metrics):
     """Render reusable metric cards in a responsive row."""
-    cols = st.columns(len(metrics))
+    if not metrics:
+        render_skeleton_metrics(count=4)
+        return
+
+    cols = responsive_columns(total_items=len(metrics), max_columns=4)
     for metric, col in zip(metrics, cols):
         with col:
-            st.markdown("<div style='background: #f8fafc; padding: 16px; border-radius: 12px;'>", unsafe_allow_html=True)
-            st.markdown(f"<div style='font-size: 24px; margin-bottom: 8px;'>{metric['icon']}</div>", unsafe_allow_html=True)
-            st.metric(label=metric["label"], value=metric["value"], delta=metric.get("delta", ""))
-            st.markdown("</div>", unsafe_allow_html=True)
+            render_kpi_tile(
+                label=metric["label"],
+                value=metric["value"],
+                delta=metric.get("delta", ""),
+                icon=metric.get("icon", ""),
+            )
