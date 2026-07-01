@@ -9,13 +9,41 @@ from app.services.api_client import APIClient
 class DisputeService(APIClient):
     """Service for dispute-related API calls"""
 
-    def get_disputes(self, status=None, priority=None, limit=50):
+    def get_disputes(
+        self,
+        status=None,
+        priority=None,
+        queue=None,
+        sla_bucket=None,
+        dispute_type=None,
+        start_date=None,
+        end_date=None,
+        search=None,
+        limit=50,
+    ):
         """Get list of disputes with optional filters."""
         params = {"limit": limit}
-        if status and status != "All":
-            params["status"] = status
-        if priority and priority != "All":
-            params["priority"] = priority
+
+        optional_filters = {
+            "status": status,
+            "priority": priority,
+            "queue": queue,
+            "sla_bucket": sla_bucket,
+            "dispute_type": dispute_type,
+            "start_date": start_date,
+            "end_date": end_date,
+            "search": search,
+        }
+
+        for key, value in optional_filters.items():
+            if value is None:
+                continue
+            if isinstance(value, str):
+                value = value.strip()
+            if value == "" or value == "All":
+                continue
+            params[key] = value
+
         return self.get("/disputes", params=params)
 
     def get_dispute_by_id(self, dispute_id):

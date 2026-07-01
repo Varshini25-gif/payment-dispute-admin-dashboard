@@ -28,6 +28,9 @@ def generate_sample_disputes(count=25):
         "Fraud review",
     ]
     assigned_to = ["Jordan", "Taylor", "Morgan", "Casey", "Riley"]
+    queues = ["Chargeback Queue", "Operations Queue", "Risk Queue", "Escalations Queue", "Refund Queue"]
+    sla_buckets = ["On Track", "Breach Risk", "Breached", "Met"]
+    dispute_types = ["Chargeback", "Fraud", "Refund", "General"]
     base_date = datetime(2026, 5, 1)
 
     rows = []
@@ -41,6 +44,9 @@ def generate_sample_disputes(count=25):
             "Created": (base_date - timedelta(days=index)).strftime("%Y-%m-%d"),
             "Reason": reasons[index % len(reasons)],
             "Assigned To": assigned_to[index % len(assigned_to)],
+            "Queue": queues[index % len(queues)],
+            "SLA Bucket": sla_buckets[index % len(sla_buckets)],
+            "Dispute Type": dispute_types[index % len(dispute_types)],
         })
 
     return pd.DataFrame(rows)

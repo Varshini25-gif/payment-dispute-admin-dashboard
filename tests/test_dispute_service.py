@@ -38,12 +38,47 @@ def test_get_disputes_builds_request(monkeypatch):
     monkeypatch.setattr(api_client_module.requests, "request", fake_request)
 
     service = DisputeService(base_url="http://api.test", timeout=5)
-    result = service.get_disputes(status="Pending", priority="High", limit=10)
+    result = service.get_disputes(
+        status="Pending",
+        priority="High",
+        queue="Risk Queue",
+        sla_bucket="Breach Risk",
+        dispute_type="Fraud",
+        start_date="2026-06-01",
+        end_date="2026-06-30",
+        search="acme",
+        limit=10,
+    )
 
     assert captured["method"] == "get"
     assert captured["url"] == "http://api.test/disputes"
-    assert captured["params"] == {"limit": 10, "status": "Pending", "priority": "High"}
+    assert captured["params"] == {
+        "limit": 10,
+        "status": "Pending",
+        "priority": "High",
+        "queue": "Risk Queue",
+        "sla_bucket": "Breach Risk",
+        "dispute_type": "Fraud",
+        "start_date": "2026-06-01",
+        "end_date": "2026-06-30",
+        "search": "acme",
+    }
     assert result == [{"dispute_id": "DIS-1001", "status": "Pending"}]
+
+
+def test_get_disputes_omits_empty_and_default_filters(monkeypatch):
+    captured = {}
+
+    def fake_request(method, url, params, json, headers, timeout):
+        captured["params"] = params
+        return DummyResponse(json_data=[])
+
+    monkeypatch.setattr(api_client_module.requests, "request", fake_request)
+
+    service = DisputeService(base_url="http://api.test")
+    service.get_disputes(status="All", priority="", queue="  ", search=None, limit=25)
+
+    assert captured["params"] == {"limit": 25}
 
 
 def test_get_disputes_propagates_http_error(monkeypatch):

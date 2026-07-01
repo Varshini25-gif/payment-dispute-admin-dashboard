@@ -1,10 +1,19 @@
 import math
+from datetime import datetime
 
 import pandas as pd
 import streamlit as st
 
+from app.components.advanced_filters import (
+    apply_advanced_dispute_filters,
+    build_filter_query_params,
+    get_default_dispute_filters,
+    render_advanced_dispute_filters,
+)
 from app.components.common import render_priority_badge, render_status_badge
-from app.components.tables import filter_disputes, generate_sample_disputes, paginate_dataframe
+from app.components.export_buttons import render_csv_export_button
+from app.components.filter_drawer import render_filter_drawer
+from app.components.tables import generate_sample_disputes, paginate_dataframe
 from app.services import dispute_service
 from app.state.session import SessionState
 
@@ -19,6 +28,68 @@ REQUIRED_DISPUTE_COLUMNS = [
     "Reason",
     "Assigned To",
 ]
+
+
+def _derive_dispute_type(reason: str) -> str:
+    reason_text = str(reason).lower()
+    if "fraud" in reason_text or "unauthorized" in reason_text:
+        return "Fraud"
+    if "refund" in reason_text:
+        return "Refund"
+    if "duplicate" in reason_text or "charge" in reason_text:
+        return "Chargeback"
+    return "General"
+
+
+def _derive_queue(assignee: str) -> str:
+    queue_map = {
+        "Jordan": "Chargeback Queue",
+        "Taylor": "Operations Queue",
+        "Morgan": "Risk Queue",
+        "Casey": "Escalations Queue",
+        "Riley": "Refund Queue",
+    }
+    return queue_map.get(str(assignee), "General Queue")
+
+
+def _derive_sla_bucket(status: str, priority: str, created_value) -> str:
+    status_text = str(status)
+    if status_text == "Resolved":
+        return "Met"
+
+    created_ts = pd.to_datetime(created_value, errors="coerce")
+    if pd.notna(created_ts):
+        age_days = (datetime.now().date() - created_ts.date()).days
+    else:
+        age_days = 0
+
+    if str(priority) == "High" and age_days >= 2:
+        return "Breach Risk"
+    if age_days >= 7:
+        return "Breached"
+    return "On Track"
+
+
+def _enrich_dispute_dimensions(df: pd.DataFrame) -> pd.DataFrame:
+    enriched = df.copy()
+
+    if "Queue" not in enriched.columns:
+        enriched["Queue"] = enriched["Assigned To"].apply(_derive_queue)
+
+    if "Dispute Type" not in enriched.columns:
+        enriched["Dispute Type"] = enriched["Reason"].apply(_derive_dispute_type)
+
+    if "SLA Bucket" not in enriched.columns:
+        enriched["SLA Bucket"] = enriched.apply(
+            lambda row: _derive_sla_bucket(
+                row.get("Status"),
+                row.get("Priority"),
+                row.get("Created"),
+            ),
+            axis=1,
+        )
+
+    return enriched
 
 
 def _normalize_dispute_records(records):
@@ -43,6 +114,12 @@ def _normalize_dispute_records(records):
         "amount": "Amount",
         "status": "Status",
         "priority": "Priority",
+        "queue": "Queue",
+        "queue_name": "Queue",
+        "sla": "SLA Bucket",
+        "sla_bucket": "SLA Bucket",
+        "dispute_type": "Dispute Type",
+        "type": "Dispute Type",
         "created": "Created",
         "created_date": "Created",
         "reason": "Reason",
@@ -60,7 +137,7 @@ def _normalize_dispute_records(records):
     if pd.api.types.is_numeric_dtype(df["Amount"]):
         df["Amount"] = df["Amount"].apply(lambda value: f"${value:,.2f}")
 
-    return df[REQUIRED_DISPUTE_COLUMNS].copy()
+    return _enrich_dispute_dimensions(df)
 
 
 def render():
@@ -74,44 +151,53 @@ def render():
 
     refresh_requested = st.button("Refresh disputes", key="refresh_disputes")
 
-    disputes_data = SessionState.get_disputes_data()
-    if refresh_requested or not isinstance(disputes_data, pd.DataFrame):
+    saved_filters = SessionState.get_dispute_filter()
+    default_filters = get_default_dispute_filters(saved_filters)
+
+    cached_data = SessionState.get_disputes_data()
+    if isinstance(cached_data, pd.DataFrame):
+        cached_data = _enrich_dispute_dimensions(cached_data)
+        queue_options = ["All"] + sorted(cached_data["Queue"].dropna().astype(str).unique().tolist())
+        sla_options = ["All"] + sorted(cached_data["SLA Bucket"].dropna().astype(str).unique().tolist())
+        dispute_type_options = ["All"] + sorted(cached_data["Dispute Type"].dropna().astype(str).unique().tolist())
+    else:
+        queue_options = ["All", "Chargeback Queue", "Operations Queue", "Risk Queue", "Escalations Queue", "Refund Queue", "General Queue"]
+        sla_options = ["All", "On Track", "Breach Risk", "Breached", "Met"]
+        dispute_type_options = ["All", "Chargeback", "Fraud", "Refund", "General"]
+
+    with render_filter_drawer("Dispute Filters", expanded=True):
+        active_filters, apply_requested = render_advanced_dispute_filters(
+            queue_options=queue_options,
+            sla_options=sla_options,
+            dispute_type_options=dispute_type_options,
+            defaults=default_filters,
+            form_key="dispute_filter_drawer_form",
+        )
+
+    if apply_requested:
+        st.session_state["disputes_page"] = 1
+
+    disputes_data = cached_data
+    if refresh_requested or apply_requested or not isinstance(disputes_data, pd.DataFrame):
         with st.spinner("Loading disputes from API..."):
             try:
-                api_response = dispute_service.get_disputes(limit=100)
+                query_params = build_filter_query_params(active_filters, limit=100)
+                api_response = dispute_service.get_disputes(**query_params)
                 disputes_data = _normalize_dispute_records(api_response)
                 SessionState.set_disputes_data(disputes_data)
                 st.success("Disputes loaded successfully.")
             except Exception as exc:
                 st.error(f"Unable to load disputes: {exc}")
                 if not isinstance(disputes_data, pd.DataFrame):
-                    disputes_data = generate_sample_disputes(25)
+                    disputes_data = _enrich_dispute_dimensions(generate_sample_disputes(25))
                     SessionState.set_disputes_data(disputes_data)
                     st.warning("Showing fallback sample disputes while the API is unavailable.")
 
     if not isinstance(disputes_data, pd.DataFrame):
-        disputes_data = generate_sample_disputes(25)
+        disputes_data = _enrich_dispute_dimensions(generate_sample_disputes(25))
         SessionState.set_disputes_data(disputes_data)
     else:
-        disputes_data = disputes_data.copy()
-
-    search_term = st.text_input(
-        "Search disputes",
-        key="disputes_search",
-        placeholder="Search by dispute ID, customer, reason, or assignee",
-    )
-
-    status_filter = st.selectbox(
-        "Status",
-        ["All", "Pending", "In Review", "Resolved", "Rejected"],
-        key="disputes_status",
-    )
-
-    priority_filter = st.selectbox(
-        "Priority",
-        ["All", "Low", "Medium", "High"],
-        key="disputes_priority",
-    )
+        disputes_data = _enrich_dispute_dimensions(disputes_data.copy())
 
     page_size = st.selectbox(
         "Rows per page",
@@ -121,17 +207,8 @@ def render():
     )
     page_size = int(page_size)
 
-    filtered_disputes = filter_disputes(
-        disputes_data,
-        search_term=search_term,
-        status=status_filter,
-        priority=priority_filter,
-    )
-    SessionState.set_dispute_filter({
-        "search_term": search_term,
-        "status": status_filter,
-        "priority": priority_filter,
-    })
+    filtered_disputes = apply_advanced_dispute_filters(disputes_data, active_filters)
+    SessionState.set_dispute_filter(active_filters)
 
     total_pages = max(1, math.ceil(len(filtered_disputes) / page_size)) if filtered_disputes else 1
     if st.session_state["disputes_page"] > total_pages:
@@ -153,6 +230,17 @@ def render():
     with summary_cols[2]:
         st.metric("Total pages", pagination["total_pages"])
 
+    export_col, summary_col = st.columns([1, 4])
+    with export_col:
+        render_csv_export_button(
+            filtered_disputes,
+            file_prefix="disputes",
+            label="⬇️ Export CSV",
+            key="disputes_csv_export_button",
+        )
+    with summary_col:
+        st.caption("Export includes all rows matching current filters, not only this page.")
+
     display_df = page_disputes.copy()
     display_df["Status"] = display_df["Status"].apply(render_status_badge)
     display_df["Priority"] = display_df["Priority"].apply(render_priority_badge)
@@ -163,6 +251,9 @@ def render():
             "Amount",
             "Status",
             "Priority",
+            "Queue",
+            "SLA Bucket",
+            "Dispute Type",
             "Created",
             "Reason",
             "Assigned To",
@@ -205,9 +296,12 @@ def render():
                 st.markdown(f"**Status:** {render_status_badge(selected_dispute['Status'])}")
                 st.markdown(f"**Priority:** {render_priority_badge(selected_dispute['Priority'])}")
                 st.markdown(f"**Amount:** {selected_dispute['Amount']}")
+                st.markdown(f"**Queue:** {selected_dispute['Queue']}")
             with detail_cols[1]:
                 st.markdown(f"**Created:** {selected_dispute['Created']}")
                 st.markdown(f"**Assigned To:** {selected_dispute['Assigned To']}")
+                st.markdown(f"**SLA:** {selected_dispute['SLA Bucket']}")
+                st.markdown(f"**Dispute Type:** {selected_dispute['Dispute Type']}")
 
             st.markdown("**Reason**")
             st.write(selected_dispute["Reason"])
